@@ -1,4 +1,4 @@
-name: Build Native Android APK
+name: Build Android APK
 
 on:
   push:
@@ -9,45 +9,50 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - name: استدعاء ملفات المشروع (Checkout)
+    - name: Checkout Repository
       uses: actions/checkout@v4
 
-    - name: إعداد بيئة جافا JDK 17
+    - name: Set up JDK 17
       uses: actions/setup-java@v4
       with:
         distribution: 'temurin'
         java-version: '17'
 
-    - name: إعداد بيئة Android SDK
+    - name: Set up Android SDK
       uses: android-actions/setup-android@v3
 
-    - name: إنشاء مشروع Gradle تلقائي لترجمة ملفات الجافا
+    - name: Organize Android Project Structure
       run: |
-        echo "جاري تجهيز هيكل بناء الـ Gradle..."
+        echo "إعادة ترتيب الملفات لهيكل مشروع أندرويد القياسي..."
         
-        # إنشاء ملف build.gradle أساسي لتجميع التطبيق
+        # إنشاء هيكل مجلدات التطبيق
+        mkdir -p app/src/main/java/com/shift/alarm
+        mkdir -p app/src/main/res
+        
+        # نقل ملفات الجافا لمكانها الصحيح
+        mv *.java app/src/main/java/com/shift/alarm/ 2>/dev/null || true
+        
+        # نقل ملف المانيفست لمكانه الصحيح
+        if [ -f "AndroidManifest.xml" ]; then
+          mv AndroidManifest.xml app/src/main/AndroidManifest.xml
+        fi
+        
+        # نقل ملفات التخطيط res
+        if [ -d "res" ]; then
+          cp -r res/* app/src/main/res/ 2>/dev/null || true
+        fi
+        
+        # إنشاء ملف إعدادات الجذر settings.gradle
+        echo "include ':app'" > settings.gradle
+        
+        # إنشاء ملف build.gradle للجذر
         cat << 'EOF' > build.gradle
         plugins {
             id 'com.android.application' version '8.1.1' apply false
         }
         EOF
 
-        mkdir -p app/src/main
-        
-        # التأكد من نقل مجلداتك الحالية داخل هيكل تطبيق أندرويد القياسي
-        if [ -d "res" ]; then
-          mv res app/src/main/res
-        fi
-        
-        if [ -f "AndroidManifest.xml" ]; then
-          mv AndroidManifest.xml app/src/main/AndroidManifest.xml
-        fi
-        
-        # نقل ملفات الجافا لمكانها الصحيح
-        mkdir -p app/src/main/java/com/shift/alarm
-        mv *.java app/src/main/java/com/shift/alarm/ 2>/dev/null || true
-
-        # إنشاء ملف إعدادات التطبيق app/build.gradle
+        # إنشاء ملف build.gradle للتطبيق app/build.gradle
         cat << 'EOF' > app/build.gradle
         plugins {
             id 'com.android.application'
@@ -68,19 +73,17 @@ jobs:
         }
         EOF
 
-        # إنشاء ملف local.properties
+        # ربط الـ SDK وإعداد Gradle Wrapper
         echo "sdk.dir=$ANDROID_HOME" > local.properties
-
-        # إنشاء ملف gradlew wrapper في حال عدم وجوده
         gradle wrapper --gradle-version 8.4
         chmod +x gradlew
 
-    - name: بناء وتشغيل حزمة الـ APK (Assemble Debug)
+    - name: Build APK (Assemble Debug)
       run: ./gradlew assembleDebug
 
-    - name: رفع ملف الـ APK الناتج كـ Artifact
+    - name: Upload APK Artifact
       uses: actions/upload-artifact@v4
       with:
-        name: app-debug-apk
-        path: app/build/outputs/apk/debug/app-debug-unified.apk
-        if-no-files-found: warn
+        name: android-debug-apk
+        path: app/build/outputs/apk/debug/*.apk
+        if-no-files-found: error
