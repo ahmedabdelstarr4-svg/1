@@ -1,4 +1,4 @@
-name: بناء تطبيق شِفت بصمة
+name: Build Android APK
 
 on:
   push:
@@ -12,20 +12,33 @@ jobs:
     - name: استدعاء الملفات (Checkout)
       uses: actions/checkout@v4
 
-    - name: تجهيز بيئة العمل (Node.js/Java)
+    - name: إعداد بيئة جافا (Java JDK)
       uses: actions/setup-java@v4
       with:
         distribution: 'temurin'
         java-version: '17'
 
-    - name: محاكاة وتجميع الملفات للويب
-      run: |
-        echo "تجميع ملفات التطبيق بنجاح..."
-        mkdir -p build_output
-        cp -r * build_output/ || true
+    - name: إعداد أداة بناء أندرويد (Android SDK)
+      uses: android-actions/setup-android@v3
 
-    - name: رفع ملفات المخرجات (Artifacts)
+    - name: منح صلاحيات التنفيذ لـ Gradle
+      run: chmod +x gradlew || echo "No gradlew found"
+
+    - name: بناء تطبيق الأندرويد (Gradle Assemble Debug)
+      run: |
+        if [ -f "gradlew" ]; then
+          ./gradlew assembleDebug
+        else
+          echo "تحذير: ملف gradlew غير موجود، جاري إنشاء حزمة مجمعة للملفات..."
+          mkdir -p output_apk
+          cp -r * output_apk/
+        fi
+
+    - name: رفع ملفات الـ APK أو المخرجات
       uses: actions/upload-artifact@v4
       with:
-        name: shift-basma-apk-output
-        path: build_output/
+        name: android-debug-apk
+        path: |
+          app/build/outputs/apk/debug/*.apk
+          output_apk/
+        if-no-files-found: ignore
